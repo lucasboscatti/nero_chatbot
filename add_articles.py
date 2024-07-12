@@ -3,7 +3,6 @@ import os
 from typing import Any
 
 import streamlit as st
-
 from database.database import (
     check_if_id_exists,
     connect_to_database,
@@ -11,10 +10,6 @@ from database.database import (
     insert_article,
 )
 from libs.indexing_articles import embedding_documents
-
-st.set_page_config(
-    page_title="🤖 Adicione novos artigos no ChatBot do Nero", layout="wide"
-)
 
 
 def check_password() -> bool:
@@ -130,7 +125,3 @@ def connect_to_articles_db() -> Any:
     if not os.path.exists("database/articles.db"):
         create_database()
     return connect_to_database()
-
-
-if __name__ == "__main__":
-    display_admin_page()

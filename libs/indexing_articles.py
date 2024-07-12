@@ -8,7 +8,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_cohere import CohereEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from llama_index.readers.smart_pdf_loader import SmartPDFLoader
-from pinecone import Pinecone
 
 os.environ["COHERE_API_KEY"] = st.secrets["COHERE_API_KEY"]
 os.environ["PINECONE_API_KEY"] = st.secrets["PINECONE_API_KEY"]
