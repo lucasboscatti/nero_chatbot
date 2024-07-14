@@ -266,10 +266,10 @@ graph = workflow.compile()
 async def process_stream(message):
     inputs = {"messages": [("human", message)]}
     async for event in graph.astream_events(inputs, version="v2"):
+        print(event)
         if event["event"] == "on_chat_model_stream":
-            content = event["data"]["chunk"].content
-            if content:
-                yield content
+            content = event["data"]["chunk"]
+            yield content.content
 
 
 def to_sync_generator(async_gen: AsyncGenerator):
