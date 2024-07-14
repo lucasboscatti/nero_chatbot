@@ -267,7 +267,7 @@ async def process_stream(message):
     inputs = {"messages": [("human", message)]}
     async for event in graph.astream_events(inputs, version="v2"):
         if event["event"] == "on_chat_model_stream":
-            content = event["data"]["content"].content
+            content = event["data"]["chunk"].content
             if content:
                 yield content
 
