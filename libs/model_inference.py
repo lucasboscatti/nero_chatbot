@@ -8,7 +8,6 @@ from langchain import hub
 from langchain.prompts import PromptTemplate
 from langchain.tools.retriever import create_retriever_tool
 from langchain_cohere import CohereEmbeddings
-from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
@@ -33,7 +32,6 @@ PINECONE_INDEX = st.secrets["PINECONE_INDEX"]
 MAX_RETRIES = 1
 VERBOSE = True
 
-tavily_search_tool = TavilySearchResults(max_results=3)
 embeddings = CohereEmbeddings(
     cohere_api_key=st.secrets["COHERE_API_KEY"], model="embed-multilingual-v3.0"
 )
@@ -43,7 +41,7 @@ retriever = vectorstore.as_retriever()
 retriever_tool = create_retriever_tool(
     retriever,
     "retrieve_nero_articles",
-    "Busca e retorne informações dos artigos do Nero sobre robótica, inteligência artificial, interação humano-robô, dronos, reinforcement learning e outras áreas correlatas",
+    "Busca e retorne informações dos artigos do Nero sobre robótica, inteligência artificial, interação humano-robô, drones, reinforcement learning e outras áreas correlatas",
 )
 
 tools = [retriever_tool]
@@ -176,6 +174,7 @@ def generate(state):
     last_message = messages[-1]
 
     question = messages[0].content
+    print(docs)
     docs = last_message.content
 
     # Prompt
@@ -241,7 +240,7 @@ graph = workflow.compile()
 async def process_stream(message):
     inputs = {"messages": [("human", message)]}
     async for event in graph.astream_events(inputs, version="v2"):
-        logger.info(event)
+        # logger.info(event)
         if event["event"] == "on_chat_model_stream":
             if (
                 event["metadata"]["langgraph_node"] == "generate"
