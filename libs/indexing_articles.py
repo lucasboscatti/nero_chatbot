@@ -2,17 +2,24 @@ import os
 from typing import Dict, List, Tuple
 
 import gdown
+import nest_asyncio
 import streamlit as st
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_cohere import CohereEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from llama_index.readers.smart_pdf_loader import SmartPDFLoader
+from llama_parse import LlamaParse
+
+nest_asyncio.apply()
+
 
 os.environ["COHERE_API_KEY"] = st.secrets["COHERE_API_KEY"]
 os.environ["PINECONE_API_KEY"] = st.secrets["PINECONE_API_KEY"]
 
+
 PINECONE_INDEX = st.secrets["PINECONE_INDEX"]
+LLAMA_CLOUD_API_KEY = st.secrets["LLAMA_CLOUD_API_KEY"]
 
 
 def add_metadata(documents: List, metadata: Dict) -> List:
@@ -36,7 +43,7 @@ def add_metadata(documents: List, metadata: Dict) -> List:
     return new_documents
 
 
-def create_pdf_documents(file_path: str, metadata: Dict) -> List:
+def create_pdf_documents(file_path: str, metadata: Dict, language) -> List:
     """
     Load PDF documents, add metadata, and split into chunks.
 
@@ -47,13 +54,13 @@ def create_pdf_documents(file_path: str, metadata: Dict) -> List:
     Returns:
         List: List of document chunks.
     """
-    documents = load_pdf(file_path)
+    documents = load_pdf(file_path, language=language)
     documents = add_metadata(documents, metadata)
     chunks = get_chunks(documents)
     return chunks
 
 
-def load_pdf(path: str) -> List:
+def load_pdf(path: str, language: str = "en") -> List:
     """
     Load PDF files.
 
@@ -63,9 +70,14 @@ def load_pdf(path: str) -> List:
     Returns:
         List: List of loaded documents.
     """
-    llmsherpa_api_url = "https://readers.llmsherpa.com/api/document/developer/parseDocument?renderFormat=all"
-    pdf_loader = SmartPDFLoader(llmsherpa_api_url=llmsherpa_api_url)
-    documents = pdf_loader.load_data(path)
+    parser = LlamaParse(
+        api_key=LLAMA_CLOUD_API_KEY,  # can also be set in your env as LLAMA_CLOUD_API_KEY
+        result_type="text",  # "markdown" and "text" are available
+        num_workers=1,  # if multiple files passed, split in `num_workers` API calls
+        verbose=True,
+        language=language,  # Optionally you can define a language, default=en
+    )
+    documents = parser.load_data(path)
     # os.remove(path)
     return documents
 
@@ -125,7 +137,7 @@ def download_from_gdrive(file_ID: str) -> str:
         st.stop()
 
 
-def embedding_documents(metadata: Dict) -> bool:
+def embedding_documents(metadata: Dict, language: str) -> bool:
     """
     Embed documents.
 
@@ -138,7 +150,7 @@ def embedding_documents(metadata: Dict) -> bool:
     file_ID = metadata["sources"].split("/")[-1]
     file_path = download_from_gdrive(file_ID)
     if file_path:
-        documents = create_pdf_documents(file_path, metadata)
+        documents = create_pdf_documents(file_path, metadata, language)
         create_and_save_index(documents)
         return True
     return False

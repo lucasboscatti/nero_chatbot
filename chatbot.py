@@ -2,6 +2,8 @@ import streamlit as st
 
 from libs.model_inference import process_stream, to_sync_generator
 
+# st.title("🤖 Converse com a AuRoRa")
+
 
 def chatbot_page():
     if "messages" not in st.session_state:

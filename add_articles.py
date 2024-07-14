@@ -3,6 +3,7 @@ import os
 from typing import Any
 
 import streamlit as st
+
 from database.database import (
     check_if_id_exists,
     connect_to_database,
@@ -60,6 +61,10 @@ def display_admin_page() -> None:
     with st.form("pdf_form"):
         gdrive_ID = st.text_input("ID do artigo no Google Drive")
         article_title = st.text_input("Nome do artigo")
+        article_language = st.selectbox(
+            "Selecionar o idioma do artigo",
+            ("Inglês", "Português"),
+        )
         article_area = st.selectbox(
             "Selecionar a área do artigo",
             (
@@ -77,11 +82,22 @@ def display_admin_page() -> None:
 
         submitted = st.form_submit_button("Enviar")
         if submitted:
-            handle_form_submission(gdrive_ID, article_title, article_area, conn)
+            article_language_map = {"Inglês": "en", "Português": "pt"}
+            handle_form_submission(
+                gdrive_ID,
+                article_title,
+                article_area,
+                conn,
+                article_language_map[article_language],
+            )
 
 
 def handle_form_submission(
-    gdrive_ID: str, article_title: str, article_area: str, conn: Any = None
+    gdrive_ID: str,
+    article_title: str,
+    article_area: str,
+    conn: Any = None,
+    article_language: str = "en",
 ) -> None:
     """Handle form submission."""
     if not gdrive_ID:
@@ -99,10 +115,11 @@ def handle_form_submission(
     article_metadata = {
         "article_title": article_title,
         "article_area": article_area,
+        "article_language": article_language,
         "sources": f"https://drive.google.com/file/d/{gdrive_ID}",
     }
 
-    success_embeddings = embedding_documents(article_metadata)
+    success_embeddings = embedding_documents(article_metadata, article_language)
 
     if success_embeddings:
         success_insert = insert_article(
