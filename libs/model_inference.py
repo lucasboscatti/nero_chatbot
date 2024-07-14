@@ -243,7 +243,10 @@ async def process_stream(message):
     async for event in graph.astream_events(inputs, version="v2"):
         logger.info(event)
         if event["event"] == "on_chat_model_stream":
-            if ["generate", "agent"] in event["metadata"]["langgraph_node"]:
+            if (
+                event["metadata"]["langgraph_node"] == "generate"
+                or event["metadata"]["langgraph_node"] == "agent"
+            ):
                 yield event["data"]["chunk"].content
 
 
