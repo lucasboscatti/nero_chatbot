@@ -8,7 +8,6 @@ from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_cohere import CohereEmbeddings
 from langchain_pinecone import PineconeVectorStore
-from llama_index.readers.smart_pdf_loader import SmartPDFLoader
 from llama_parse import LlamaParse
 
 nest_asyncio.apply()
@@ -78,7 +77,7 @@ def load_pdf(path: str, language: str = "en") -> List:
         language=language,  # Optionally you can define a language, default=en
     )
     documents = parser.load_data(path)
-    # os.remove(path)
+    os.remove(path)
     return documents
 
 
