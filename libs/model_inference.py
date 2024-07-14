@@ -4,7 +4,8 @@ import os
 from typing import Annotated, AsyncGenerator, Literal, TypedDict
 
 import streamlit as st
-from langchain.prompts import PromptTemplate
+from langchain import hub
+from langchain.prompts import ChatPromptTemplate
 from langchain.schema import Document
 from langchain_cohere import CohereEmbeddings
 from langchain_community.tools.tavily_search import TavilySearchResults
@@ -33,10 +34,12 @@ MAX_RETRIES = 3
 VERBOSE = True
 
 tavily_search_tool = TavilySearchResults(max_results=3)
-embeddings = CohereEmbeddings(cohere_api_key=st.secrets["COHERE_API_KEY"])
+embeddings = CohereEmbeddings(
+    cohere_api_key=st.secrets["COHERE_API_KEY"], model="embed-multilingual-v3.0"
+)
 vectorstore = PineconeVectorStore(index_name=PINECONE_INDEX, embedding=embeddings)
 retriever = vectorstore.as_retriever()
-llm = ChatGroq(model="llama3-8b-8192")
+llm = ChatGroq(model="llama3-70b-8192")
 
 
 class GraphState(TypedDict):
@@ -81,17 +84,7 @@ def document_search(state: GraphState):
     return {"documents": documents, "question": question, "web_fallback": True}
 
 
-RAG_PROMPT = PromptTemplate(
-    template="""<|begin_of_text|><|start_header_id|>system<|end_header_id|> You are an assistant for question-answering tasks.
-Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know.
-Use three sentences maximum and keep the answer concise 
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-Question: {question}
-Context: {context}
-Answer: 
-<|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
-    input_variables=["context", "question"],
-)
+RAG_PROMPT: ChatPromptTemplate = hub.pull("lucasboscatti/nero_rag_prompt_en")
 
 
 def generate(state: GraphState):
@@ -115,13 +108,8 @@ def generate(state: GraphState):
     return {"retries": retries + 1, "candidate_answer": generation}
 
 
-QUERY_REWRITER_PROMPT = PromptTemplate(
-    template="""<|begin_of_text|><|start_header_id|>system<|end_header_id|> You a question re-writer that converts an input question to a better version that is optimized for vectorstore retrieval.
-Look at the input and try to reason about the underlying semantic intent / meaning. 
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-Here is the initial question: \n\n {question} \n Formulate an improved question. 
-<|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
-    input_variables=["question"],
+QUERY_REWRITER_PROMPT: ChatPromptTemplate = hub.pull(
+    "lucasboscatti/nero_query_rewriter_en"
 )
 
 
@@ -175,15 +163,8 @@ class GradeHallucinations(BaseModel):
     )
 
 
-HALLUCINATION_GRADER_PROMPT = PromptTemplate(
-    template="""<|begin_of_text|><|start_header_id|>system<|end_header_id|> You are a grader assessing whether an LLM generation is grounded in / supported by a set of retrieved facts.
-Give a binary score 'yes' or 'no', where 'yes' means that the answer is grounded in / supported by the set of facts.
-
-IF the generation includes code examples, make sure those examples are FULLY present in the set of facts, otherwise always return score 'no'. 
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-Set of facts: \n\n {documents} \n\n LLM generation: {generation}
-<|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
-    input_variables=["documents", "generation"],
+HALLUCINATION_GRADER_PROMPT: ChatPromptTemplate = hub.pull(
+    "lucasboscatti/nero_hallucination_grader_en"
 )
 
 
@@ -195,13 +176,8 @@ class GradeAnswer(BaseModel):
     )
 
 
-ANSWER_GRADER_PROMPT = PromptTemplate(
-    template="""<|begin_of_text|><|start_header_id|>system<|end_header_id|> You are a grader assessing whether an answer addresses / resolves a question.
-Give a binary score 'yes' or 'no', where 'yes' means that the answer resolves the question. 
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-User question: \n\n {question} \n\n LLM generation: {generation}
-<|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
-    input_variables=["question", "generation"],
+ANSWER_GRADER_PROMPT: ChatPromptTemplate = hub.pull(
+    "lucasboscatti/nero_answer_grader_en"
 )
 
 
@@ -289,8 +265,10 @@ graph = workflow.compile()
 
 async def process_stream(message):
     inputs = {"messages": [("human", message)]}
-    async for event in graph.astream_events(inputs, version="v2"):  
-        if event["event"] == "on_chat_model_stream" and event["metadata"]['langgraph_step'] == 7: 
+    async for event in graph.astream_events(inputs, version="v2"):
+        if (
+            event["event"] == "on_chat_model_stream"
+        ):  # and event["metadata"]['langgraph_step'] == 7:
             yield event["data"]["chunk"].content
 
 

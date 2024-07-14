@@ -142,3 +142,6 @@ def connect_to_articles_db() -> Any:
     if not os.path.exists("database/articles.db"):
         create_database()
     return connect_to_database()
+
+
+display_admin_page()
