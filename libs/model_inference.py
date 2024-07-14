@@ -5,17 +5,17 @@ from typing import Annotated, AsyncGenerator, Literal, TypedDict
 
 import streamlit as st
 from langchain import hub
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema import Document
+from langchain.prompts import PromptTemplate
+from langchain.tools.retriever import create_retriever_tool
 from langchain_cohere import CohereEmbeddings
 from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_core.documents import Document
-from langchain_core.messages import AIMessage, BaseMessage, convert_to_messages
+from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_groq import ChatGroq
 from langchain_pinecone import PineconeVectorStore
-from langgraph.graph import END, StateGraph, add_messages
+from langgraph.graph import END, START, StateGraph, add_messages
+from langgraph.prebuilt import ToolNode, tools_condition
 from typing_extensions import TypedDict
 
 logger = logging.getLogger(__name__)
@@ -39,225 +39,200 @@ embeddings = CohereEmbeddings(
 )
 vectorstore = PineconeVectorStore(index_name=PINECONE_INDEX, embedding=embeddings)
 retriever = vectorstore.as_retriever()
-llm = ChatGroq(model="llama3-70b-8192")
 
-
-class GraphState(TypedDict):
-    """
-    Represents the state of our graph.
-    Attributes:
-        question: question
-        generation: LLM generation
-        ask_question: whether to ask questions
-        documents: list of documents
-    """
-
-    messages: Annotated[list[BaseMessage], add_messages]
-    question: str
-    documents: list[Document]
-    candidate_answer: str
-    retries: int
-    web_fallback: bool
-
-
-class GraphConfig(TypedDict):
-    max_retries: int
-
-
-def document_search(state: GraphState):
-    """
-    Retrieve documents
-
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        state (dict): New key added to state, documents, that contains retrieved documents
-    """
-    if VERBOSE:
-        logger.info("---RETRIEVE---")
-
-    question = convert_to_messages(state["messages"])[-1].content
-
-    # Retrieval
-    documents = retriever.invoke(question)
-    return {"documents": documents, "question": question, "web_fallback": True}
-
-
-RAG_PROMPT: ChatPromptTemplate = hub.pull("lucasboscatti/nero_rag_prompt_en")
-
-
-def generate(state: GraphState):
-    """
-    Generate answer
-
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        state (dict): New key added to state, generation, that contains LLM generation
-    """
-    if VERBOSE:
-        logger.info("---GENERATE---")
-    question = state["question"]
-    documents = state["documents"]
-    retries = state["retries"] if state.get("retries") is not None else -1
-
-    rag_chain = RAG_PROMPT | llm | StrOutputParser()
-    generation = rag_chain.invoke({"context": documents, "question": question})
-    return {"retries": retries + 1, "candidate_answer": generation}
-
-
-QUERY_REWRITER_PROMPT: ChatPromptTemplate = hub.pull(
-    "lucasboscatti/nero_query_rewriter_en"
+retriever_tool = create_retriever_tool(
+    retriever,
+    "retrieve_nero_articles",
+    "Busca e retorne informações dos artigos do Nero sobre robótica, inteligência artificial, interação humano-robô, dronos, reinforcement learning e outras áreas correlatas",
 )
 
+tools = [retriever_tool]
 
-def transform_query(state: GraphState):
+llm = ChatGroq(model="llama3-70b-8192", temperature=0)
+
+
+class AgentState(TypedDict):
+    messages: Annotated[list[BaseMessage], add_messages]
+
+
+def grade_documents(state) -> Literal["generate", "rewrite"]:
+    """
+    Determines whether the retrieved documents are relevant to the question.
+
+    Args:
+        state (messages): The current state
+
+    Returns:
+        str: A decision for whether the documents are relevant or not
+    """
+    logger.info("---CHECK RELEVANCE---")
+
+    # Data model
+    class grade(BaseModel):
+        """Binary score for relevance check."""
+
+        binary_score: str = Field(description="Relevance score 'yes' or 'no'")
+
+    # LLM with tool and validation
+    llm_with_tool = llm.with_structured_output(grade)
+
+    # Prompt
+    prompt = PromptTemplate(
+        template="""Você é um avaliador analisando a relevância de um documento recuperado em relação a uma pergunta do usuário. \n 
+        Aqui está o documento recuperado: \n\n {context} \n\n
+        Aqui está a pergunta do usuário: {question} \n
+        Se o documento contiver palavra(s)-chave ou significado semântico relacionado à pergunta do usuário, avalie-o como relevante. \n
+        Dê uma pontuação binária 'yes' ou 'no' para indicar se o documento é relevante para a pergunta.""",
+        input_variables=["context", "question"],
+    )
+
+    # Chain
+    chain = prompt | llm_with_tool
+
+    messages = state["messages"]
+    last_message = messages[-1]
+
+    question = messages[0].content
+    docs = last_message.content
+
+    scored_result = chain.invoke({"question": question, "context": docs})
+
+    score = scored_result.binary_score
+
+    if score == "yes":
+        logger.info("---DECISION: DOCS RELEVANT---")
+        return "generate"
+
+    else:
+        logger.info("---DECISION: DOCS NOT RELEVANT---")
+        logger.info(score)
+        return "rewrite"
+
+
+def agent(state):
+    """
+    Invokes the agent model to generate a response based on the current state. Given
+    the question, it will decide to retrieve using the retriever tool, or simply end.
+
+    Args:
+        state (messages): The current state
+
+    Returns:
+        dict: The updated state with the agent response appended to messages
+    """
+    logger.info("---CALL AGENT---")
+    messages = state["messages"]
+    model = llm.bind_tools(tools)
+    response = model.invoke(messages)
+    # We return a list, because this will get added to the existing list
+    return {"messages": [response]}
+
+
+def rewrite(state):
     """
     Transform the query to produce a better question.
 
     Args:
-        state (dict): The current graph state
+        state (messages): The current state
 
     Returns:
-        state (dict): Updates question key with a re-phrased question
+        dict: The updated state with re-phrased question
     """
-    if VERBOSE:
-        logger.info("---TRANSFORM QUERY---")
 
-    question = state["question"]
+    logger.info("---TRANSFORM QUERY---")
+    messages = state["messages"]
+    question = messages[0].content
 
-    # Re-write question
-    query_rewriter = QUERY_REWRITER_PROMPT | llm | StrOutputParser()
-    better_question = query_rewriter.invoke({"question": question})
-    return {"question": better_question}
+    msg = [
+        HumanMessage(
+            content=f""" \n 
+    Olhe para a entrada e tente raciocinar sobre a intenção/ significado semântico subjacente. \n
+    Aqui está a pergunta inicial:
+    \n ------- \n
+    {question} 
+    \n ------- \n
+    Formule uma pergunta aprimorada: """,
+        )
+    ]
 
-
-def web_search(state: GraphState):
-    if VERBOSE:
-        logger.info("---RUNNING WEB SEARCH---")
-
-    question = state["question"]
-    documents = state["documents"]
-    search_results = tavily_search_tool.invoke(question)
-    search_content = "\n".join([d["content"] for d in search_results])
-    documents.append(
-        Document(page_content=search_content, metadata={"source": "websearch"})
-    )
-    return {"documents": documents, "web_fallback": False}
+    # Grader
+    response = llm.invoke(msg)
+    return {"messages": [response]}
 
 
-def finalize_response(state: GraphState):
-    if VERBOSE:
-        logger.info("---FINALIZING THE RESPONSE---")
-
-    return {"messages": [AIMessage(content=state["candidate_answer"])]}
-
-
-class GradeHallucinations(BaseModel):
-    """Binary score for hallucination present in generation answer."""
-
-    binary_score: str = Field(
-        description="Answer is grounded in the facts, 'yes' or 'no'"
-    )
-
-
-HALLUCINATION_GRADER_PROMPT: ChatPromptTemplate = hub.pull(
-    "lucasboscatti/nero_hallucination_grader_en"
-)
-
-
-class GradeAnswer(BaseModel):
-    """Binary score to assess answer addresses question."""
-
-    binary_score: str = Field(
-        description="Answer addresses the question, 'yes' or 'no'"
-    )
-
-
-ANSWER_GRADER_PROMPT: ChatPromptTemplate = hub.pull(
-    "lucasboscatti/nero_answer_grader_en"
-)
-
-
-def grade_generation_v_documents_and_question(
-    state: GraphState, config
-) -> Literal["generate", "transform_query", "web_search", "finalize_response"]:
+def generate(state):
     """
-    Determines whether the generation is grounded in the document and answers question.
+    Generate answer
 
     Args:
-        state (dict): The current graph state
+        state (messages): The current state
 
     Returns:
-        str: Decision for next node to call
+         dict: The updated state with re-phrased question
     """
-    question = state["question"]
-    documents = state["documents"]
-    generation = state["candidate_answer"]
-    web_fallback = state["web_fallback"]
-    retries = state["retries"] if state.get("retries") is not None else -1
-    max_retries = config.get("configurable", {}).get("max_retries", MAX_RETRIES)
+    logger.info("---GENERATE---")
+    messages = state["messages"]
+    question = messages[0].content
+    last_message = messages[-1]
 
-    # this means we've already gone through web fallback and can return to the user
-    if not web_fallback:
-        return "finalize_response"
+    question = messages[0].content
+    docs = last_message.content
 
-    if VERBOSE:
-        logger.info("---CHECK HALLUCINATIONS---")
-
-    hallucination_grader = HALLUCINATION_GRADER_PROMPT | llm.with_structured_output(
-        GradeHallucinations
-    )
-    hallucination_grade: GradeHallucinations = hallucination_grader.invoke(
-        {"documents": documents, "generation": generation}
+    # Prompt
+    prompt = PromptTemplate(
+        template="""Você é um assistente para tarefas de perguntas e respostas. Use os seguintes trechos de contexto recuperados para responder à pergunta. Se não souber a resposta, diga apenas que não sabe. Use no máximo três frases e mantenha a resposta concisa.
+        Pergunta: {question}
+        Contexto: {context}
+        Resposta:""",
+        input_variables=["question", "context"],
     )
 
-    # Check hallucination
-    if hallucination_grade.binary_score == "no":
-        if VERBOSE:
-            logger.info(
-                "---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---"
-            )
-        return "generate" if retries < max_retries else "web_search"
+    # Post-processing
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
 
-    if VERBOSE:
-        logger.info("---DECISION: GENERATION IS GROUNDED IN DOCUMENTS---")
-        logger.info("---GRADE GENERATION vs QUESTION---")
+    # Chain
+    rag_chain = prompt | llm | StrOutputParser()
 
-    # Check question-answering
-    answer_grader = ANSWER_GRADER_PROMPT | llm.with_structured_output(GradeAnswer)
-    answer_grade: GradeAnswer = answer_grader.invoke(
-        {"question": question, "generation": generation}
-    )
-    if answer_grade.binary_score == "yes":
-        if VERBOSE:
-            logger.info("---DECISION: GENERATION ADDRESSES QUESTION---")
-        return "finalize_response"
-    else:
-        if VERBOSE:
-            logger.info("---DECISION: GENERATION DOES NOT ADDRESS QUESTION---")
-        return "transform_query" if retries < max_retries else "web_search"
+    # Run
+    response = rag_chain.invoke({"context": docs, "question": question})
+    return {"messages": [response]}
 
 
-workflow = StateGraph(GraphState, config_schema=GraphConfig)
+# Define a new graph
+workflow = StateGraph(AgentState)
 
-# Define the nodes
-workflow.add_node("document_search", document_search)
-workflow.add_node("generate", generate)
-workflow.add_node("transform_query", transform_query)
-workflow.add_node("web_search", web_search)
-workflow.add_node("finalize_response", finalize_response)
+# Define the nodes we will cycle between
+workflow.add_node("agent", agent)  # agent
+retrieve = ToolNode([retriever_tool])
+workflow.add_node("retrieve", retrieve)  # retrieval
+workflow.add_node("rewrite", rewrite)  # Re-writing the question
+workflow.add_node(
+    "generate", generate
+)  # Generating a response after we know the documents are relevant
+# Call agent node to decide to retrieve or not
+workflow.add_edge(START, "agent")
 
-# Build graph
-workflow.set_entry_point("document_search")
-workflow.add_edge("document_search", "generate")
-workflow.add_edge("transform_query", "document_search")
-workflow.add_edge("web_search", "generate")
-workflow.add_edge("finalize_response", END)
+# Decide whether to retrieve
+workflow.add_conditional_edges(
+    "agent",
+    # Assess agent decision
+    tools_condition,
+    {
+        # Translate the condition outputs to nodes in our graph
+        "tools": "retrieve",
+        END: END,
+    },
+)
 
-workflow.add_conditional_edges("generate", grade_generation_v_documents_and_question)
+# Edges taken after the `action` node is called.
+workflow.add_conditional_edges(
+    "retrieve",
+    # Assess agent decision
+    grade_documents,
+)
+workflow.add_edge("generate", END)
+workflow.add_edge("rewrite", "agent")
 
 # Compile
 graph = workflow.compile()
@@ -266,7 +241,7 @@ graph = workflow.compile()
 async def process_stream(message):
     inputs = {"messages": [("human", message)]}
     async for event in graph.astream_events(inputs, version="v2"):
-        print(event)
+        logger.info(event)
         if event["event"] == "on_chat_model_stream":
             content = event["data"]["chunk"]
             yield content.content
