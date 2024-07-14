@@ -243,8 +243,8 @@ async def process_stream(message):
     async for event in graph.astream_events(inputs, version="v2"):
         logger.info(event)
         if event["event"] == "on_chat_model_stream":
-            content = event["data"]["chunk"]
-            yield content.content
+            if ["generate", "agent"] in event["metadata"]["langgraph_node"]:
+                yield event["data"]["chunk"].content
 
 
 def to_sync_generator(async_gen: AsyncGenerator):
