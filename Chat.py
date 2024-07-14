@@ -13,26 +13,6 @@ def reset_conversation():
 
 
 with st.sidebar:
-    # Create a dropdown box
-    language_options = ["English", "Portuguese"]
-    article_area = st.selectbox(
-        "Select an article area:",
-        (
-            "All",
-            "CA - Controle Aéreo",
-            "CT - Controle Terrestre",
-            "FA - Formação Aérea",
-            "FH - Formação Heterogêneo",
-            "FT - Formação Terrestre",
-            "HR - Interação Humano-Robô",
-            "IA - Inteligência Artificial",
-            "RC - Robótica Competições",
-            "RE - Robótica Educacional",
-        ),
-    )
-
-    selected_language = st.selectbox("Select language:", language_options)
-
     st.button("New Chat", on_click=reset_conversation, type="primary")
 
 if "messages" not in st.session_state:

@@ -30,7 +30,7 @@ os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
 os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
 PINECONE_INDEX = st.secrets["PINECONE_INDEX"]
 
-MAX_RETRIES = 3
+MAX_RETRIES = 1
 VERBOSE = True
 
 tavily_search_tool = TavilySearchResults(max_results=3)
