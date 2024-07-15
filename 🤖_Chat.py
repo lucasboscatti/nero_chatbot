@@ -5,8 +5,8 @@ from libs.inference import *
 # Set Streamlit page configuration
 st.set_page_config(page_title="Chat With AuRoRa", layout="wide", page_icon="🤖")
 
-st.title("# 🤖 AuRoRa Chat")
-st.caption("🚀 Nero's Virtual Assistant")
+st.title("🤖 AuRoRa Chat")
+st.caption("💬 Nero Virtual Assistant")
 
 
 def reset_conversation():
