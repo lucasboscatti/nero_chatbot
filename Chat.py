@@ -1,12 +1,11 @@
 import streamlit as st
 
-from libs.model_inference import *
+from libs.inference import *
 
 # Set Streamlit page configuration
 st.set_page_config(page_title="Chat With AuRoRa", layout="wide", page_icon="🤖")
-
-
 st.markdown("# 🤖 AuRoRa Chat")
+
 
 def reset_conversation():
     st.session_state.messages = []
@@ -29,11 +28,12 @@ if question := st.chat_input("Faça sua pergunta"):
     st.session_state.messages.append({"role": "user", "content": question})
 
     with st.chat_message("assistant"):
-        try:
-            response = st.write_stream(to_sync_generator(process_stream(question)))
-        except Exception as e:
-            st.markdown("Internal error. Tente novamente mais tarde.")
-        else:
-            st.session_state.messages.append(
-                {"role": "assistant", "content": response}
-            )
+        response = st.write_stream(chat_answer(question))
+        with open("sources.txt", "r") as file:
+            index = 1
+            st.markdown("Fontes: ")
+            for line in file:
+                line = line.strip()
+                st.markdown(f"[{index}] {line}")
+                index += 1
+        st.session_state.messages.append({"role": "assistant", "content": response})
