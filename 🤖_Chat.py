@@ -30,12 +30,12 @@ if question := st.chat_input("Faça sua pergunta"):
     with st.chat_message("assistant"):
         response = st.write_stream(chat_answer(question))
         with open("sources.txt", "r") as file:
-            index = 1
-            st.markdown("Fontes: ")
-            for line in file:
+            lines = file.readlines()
+        if lines:  # Check if the file is not empty
+            st.markdown("Fontes:")
+            for index, line in enumerate(lines, start=1):
                 line = line.strip()
-                formmated_source = f"[{index}] {line}"
-                st.markdown(formmated_source)
-                index += 1
-                response += "\n" + formmated_source
+                formatted_source = f"[{index}] {line}"
+                st.markdown(formatted_source)
+                response += "\n" + formatted_source
         st.session_state.messages.append({"role": "assistant", "content": response})
