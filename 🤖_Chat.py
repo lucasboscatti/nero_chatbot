@@ -34,7 +34,7 @@ if question := st.chat_input("Faça sua pergunta"):
             st.markdown("Fontes: ")
             for line in file:
                 line = line.strip()
-                formmated_source = f"[{index}] [{line}]"
+                formmated_source = f"[{index}] {line}"
                 st.markdown(formmated_source)
                 index += 1
                 response += "\n" + formmated_source
