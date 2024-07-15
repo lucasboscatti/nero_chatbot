@@ -37,7 +37,7 @@ if question := st.chat_input("Faça sua pergunta"):
             st.markdown("Fontes:")
             for index, line in enumerate(lines, start=1):
                 line = line.strip()
-                formatted_source = f"[{index}] {line}"
+                formatted_source = f"\n[{index}] {line}"
                 st.markdown(formatted_source)
-                response += "\n" + formatted_source
+                response += formatted_source
         st.session_state.messages.append({"role": "assistant", "content": response})
