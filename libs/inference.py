@@ -67,6 +67,8 @@ def chat_answer(question):
                 for document in documents:
                     if document["id"] == citation:
                         sources.append(document["title"])
+
+            sources = list(set(sources))
                         
             with open("sources.txt", "w") as f:
                 f.write("\n".join(sources))
