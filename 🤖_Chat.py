@@ -15,8 +15,8 @@ def reset_conversation():
 
 
 with st.sidebar:
-    st.button("New Chat", on_click=reset_conversation, type="primary")
     language = st.selectbox("Language", ("English", "Portuguese"))
+    st.button("New Chat", on_click=reset_conversation, type="primary")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
