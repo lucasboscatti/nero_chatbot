@@ -1,6 +1,7 @@
 import streamlit as st
 
 from libs.inference import *
+from libs.prompt import *
 
 # Set Streamlit page configuration
 st.set_page_config(page_title="Chat With AuRoRa", layout="wide", page_icon="🤖")
@@ -15,6 +16,7 @@ def reset_conversation():
 
 with st.sidebar:
     st.button("New Chat", on_click=reset_conversation, type="primary")
+    language = st.selectbox("Language", ("English", "Portuguese"))
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -23,17 +25,18 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if question := st.chat_input("Faça sua pergunta"):
+if question := st.chat_input("Ask your question:"):
     with st.chat_message("user"):
         st.markdown(question)
 
     st.session_state.messages.append({"role": "user", "content": question})
 
     with st.chat_message("assistant"):
-        response = st.write_stream(chat_answer(question))
+        preamble = prompt_en if language == "English" else prompt_pt
+        response = st.write_stream(chat_answer(question, preamble))
         with open("sources.txt", "r") as file:
             lines = file.readlines()
-        if lines:  # Check if the file is not empty
+        if lines:
             st.markdown("Fontes:")
             for index, line in enumerate(lines, start=1):
                 line = line.strip()

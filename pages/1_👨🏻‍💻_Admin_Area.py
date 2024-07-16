@@ -61,10 +61,6 @@ def display_admin_page() -> None:
     with st.form("pdf_form"):
         gdrive_ID = st.text_input("ID do artigo no Google Drive")
         article_title = st.text_input("Nome do artigo")
-        article_language = st.selectbox(
-            "Selecionar o idioma do artigo",
-            ("Inglês", "Português"),
-        )
         article_area = st.selectbox(
             "Selecionar a área do artigo",
             (
@@ -82,13 +78,11 @@ def display_admin_page() -> None:
 
         submitted = st.form_submit_button("Enviar")
         if submitted:
-            article_language_map = {"Inglês": "en", "Português": "pt"}
             handle_form_submission(
                 gdrive_ID,
                 article_title,
                 article_area,
-                conn,
-                article_language_map[article_language],
+                conn
             )
 
 
@@ -96,8 +90,7 @@ def handle_form_submission(
     gdrive_ID: str,
     article_title: str,
     article_area: str,
-    conn: Any = None,
-    article_language: str = "en",
+    conn: Any = None
 ) -> None:
     """Handle form submission."""
     if not gdrive_ID:
@@ -115,11 +108,10 @@ def handle_form_submission(
     article_metadata = {
         "article_title": article_title,
         "article_area": article_area,
-        "article_language": article_language,
         "sources": f"https://drive.google.com/file/d/{gdrive_ID}",
     }
 
-    success_embeddings = embedding_documents(article_metadata, article_language)
+    success_embeddings = embedding_documents(article_metadata)
 
     if success_embeddings:
         success_insert = insert_article(

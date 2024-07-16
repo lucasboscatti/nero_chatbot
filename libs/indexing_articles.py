@@ -42,7 +42,7 @@ def add_metadata(documents: List, metadata: Dict) -> List:
     return new_documents
 
 
-def create_pdf_documents(file_path: str, metadata: Dict, language) -> List:
+def create_pdf_documents(file_path: str, metadata: Dict) -> List:
     """
     Load PDF documents, add metadata, and split into chunks.
 
@@ -53,13 +53,13 @@ def create_pdf_documents(file_path: str, metadata: Dict, language) -> List:
     Returns:
         List: List of document chunks.
     """
-    documents = load_pdf(file_path, language=language)
+    documents = load_pdf(file_path)
     documents = add_metadata(documents, metadata)
     chunks = get_chunks(documents)
     return chunks
 
 
-def load_pdf(path: str, language: str = "en") -> List:
+def load_pdf(path: str) -> List:
     """
     Load PDF files.
 
@@ -74,7 +74,6 @@ def load_pdf(path: str, language: str = "en") -> List:
         result_type="text",  # "markdown" and "text" are available
         num_workers=1,  # if multiple files passed, split in `num_workers` API calls
         verbose=True,
-        language=language,  # Optionally you can define a language, default=en
     )
     documents = parser.load_data(path)
     os.remove(path)
@@ -136,7 +135,7 @@ def download_from_gdrive(file_ID: str) -> str:
         st.stop()
 
 
-def embedding_documents(metadata: Dict, language: str) -> bool:
+def embedding_documents(metadata: Dict) -> bool:
     """
     Embed documents.
 
@@ -149,7 +148,7 @@ def embedding_documents(metadata: Dict, language: str) -> bool:
     file_ID = metadata["sources"].split("/")[-1]
     file_path = download_from_gdrive(file_ID)
     if file_path:
-        documents = create_pdf_documents(file_path, metadata, language)
+        documents = create_pdf_documents(file_path, metadata)
         create_and_save_index(documents)
         return True
     return False
