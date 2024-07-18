@@ -76,6 +76,7 @@ def display_admin_page() -> None:
                 "Robotics Competition",
                 "Educational Robotics",
             ),
+            index=None,
             placeholder="Area of research",
         )
         publication_year = st.selectbox(
@@ -145,11 +146,12 @@ def handle_form_submission(
     }
 
     try:
-        success_embeddings = embedding_documents(article_doc, article_metadata)
+        with st.spinner("Processing the paper... This may take a moment."):
+            success_embeddings = embedding_documents(article_doc, article_metadata)
         if success_embeddings:
-            st.success("Article added successfully!")
+            st.success("Paper added successfully!")
         else:
-            st.warning("Error inserting the article. Please try again.")
+            st.warning("Error inserting the paper. Please try again.")
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
 
