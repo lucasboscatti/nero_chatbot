@@ -31,9 +31,9 @@ def check_password() -> bool:
 
     if st.session_state.get("password_correct", False):
         return True
-    st.markdown("# Administrator Area")
-    st.write(
-        "This area is exclusively for administrators. If you are not an administrator, please return to AuRoRa Chat."
+    st.markdown("# 🖥️🔒 Administrator Area")
+    st.markdown(
+        "This area is exclusively for administrators. If you are not an administrator, please return to [AuRoRa Chat](https://nero-chatbot.streamlit.app/)."
     )
 
     st.text_input(
