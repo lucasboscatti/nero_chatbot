@@ -31,11 +31,13 @@ def display_sources(sources: List[str]):
             st.markdown(f"\n[{index}] {source}")
 
 
-def handle_user_input(question: str):
+def handle_user_input(question: str, research_area: str):
     st.session_state.messages.append({"role": "user", "content": question})
 
     with st.chat_message("assistant"):
-        response = st.write_stream(chat_answer(question, st.session_state.messages))
+        response = st.write_stream(
+            chat_answer(question, st.session_state.messages, research_area)
+        )
 
         with open("sources.txt", "r") as file:
             sources = [line.strip() for line in file.readlines()]
@@ -52,55 +54,105 @@ def handle_user_input(question: str):
         st.session_state.messages.append({"role": "assistant", "content": response})
 
 
-def set_sidebar_footer():
+def set_sidebar_text():
     # CSS for styling the sidebar footer
     css = """
     <style>
+    .sidebar .sidebar-content {
+        background-color: #1E1E1E;
+        color: #FFFFFF;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+    }
+    .sidebar h2 {
+        color: #FFFFFF;
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 20px;
+    }
+    .sidebar p {
+        font-size: 14px;
+        line-height: 1.6;
+        margin-bottom: 20px;
+    }
+    .sidebar .stButton>button {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    .sidebar .stSelectbox {
+        margin-bottom: 30px;
+    }
+    .follow-us {
+        margin-top: 70px;
+    }
+    .follow-us p {
+        font-size: 14px;
+        margin-bottom: 10px;
+    }
     .sidebar-footer {
-        margin-top: 600px; /* Adjust the margin as needed */
         display: flex;
         justify-content: center;
-        gap: 10px;
+        gap: 15px;
+        margin-bottom: 20px;
     }
-    .sidebar-footer img {
-        width: 24px;
-        height: 24px;
+    .sidebar-footer a {
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+    .sidebar-footer a:hover {
+        opacity: 1;
     }
     .copyright {
-        color: #666666;
+        color: #AAAAAA;
         font-size: 12px;
         text-align: center;
-        margin-top: 20px;
+    }
+    .copyright a {
+        color: #AAAAAA;
+        text-decoration: none;
+    }
+    .copyright a:hover {
+        text-decoration: underline;
     }
     </style>
     """
 
+    about_us_text = """
+    <h2>About Us</h2>
+    <p>NERO, founded in October 2010, is a research laboratory at UFV focused on robotics, encompassing control, automation, electronics, and computer science. It addresses challenges in robot navigation, cooperation, and human-robot interaction using AI and computer vision. NERO provides extensive documentation and maintains the AuRoRA Platform for project facilitation, promoting an inclusive, collaborative environment to advance robotics.</p>
+    """
+
     social_links = """
+    <div class="follow-us">
+        <p>Follow us on social media for the latest updates and news:</p>
+    </div>
     <div class="sidebar-footer">
         <a href="https://www.instagram.com/roboticaufv/" target="_blank">
-            <img src="https://cdn2.iconfinder.com/data/icons/social-media-2285/512/1_Instagram_colored_svg_1-512.png">
+            <img src="https://cdn-icons-png.flaticon.com/128/3955/3955024.png" width="24" height="24" alt="Instagram">
         </a>
         <a href="https://www.facebook.com/roboticaUFV" target="_blank">
-            <img src="https://cdn2.iconfinder.com/data/icons/social-media-2285/512/1_Facebook_colored_svg_copy-512.png">
+            <img src="https://cdn-icons-png.flaticon.com/128/1384/1384053.png" width="24" height="24" alt="Facebook">
         </a>
         <a href="https://www.linkedin.com/company/roboticaufv/" target="_blank">
-            <img src="https://cdn2.iconfinder.com/data/icons/social-media-2285/512/1_Linkedin_unofficial_colored_svg-512.png">
+            <img src="https://cdn-icons-png.flaticon.com/128/3536/3536505.png" width="24" height="24" alt="LinkedIn">
         </a>
         <a href="https://www.youtube.com/c/roboticaufv" target="_blank">
-            <img src="https://cdn2.iconfinder.com/data/icons/social-media-2285/512/1_Youtube_colored_svg-512.png">
+            <img src="https://cdn-icons-png.flaticon.com/128/3670/3670147.png" width="24" height="24" alt="YouTube">
         </a>
     </div>
     """
 
     copyright_text = """
     <p class="copyright">
-        <a href="https://nero-chatbot-add-paper-area.streamlit.app/" target="_blank" style="color: #666666; text-decoration: none;">
+        <a href="https://nero-chatbot-add-paper-area.streamlit.app/" target="_blank" style="color: #AAAAAA; text-decoration: none;">
             © 2024 Núcleo de Especialização em Robótica - UFV
         </a>
     </p>
     """
 
-    st.sidebar.markdown(css + social_links, unsafe_allow_html=True)
+    st.markdown(css, unsafe_allow_html=True)
+    st.sidebar.markdown(about_us_text, unsafe_allow_html=True)
+    st.sidebar.markdown(social_links, unsafe_allow_html=True)
     st.sidebar.markdown(copyright_text, unsafe_allow_html=True)
 
 
@@ -112,15 +164,30 @@ def main():
     st.caption("💬 Nero Virtual Assistant")
 
     with st.sidebar:
+        research_area = st.selectbox(
+            "Filter by research area",
+            (
+                "All",
+                "Aerial Robot Control",
+                "Ground Robot Control",
+                "Robot Formation",
+                "Robot Control",
+                "Formation Control",
+                "Human-Robot Interaction",
+                "Artificial Intelligence",
+                "Robotics Competition",
+                "Educational Robotics",
+            ),
+        )
         st.button("New Chat", on_click=new_chat, type="primary")
-        set_sidebar_footer()
+        set_sidebar_text()
 
     display_chat_history()
 
     if question := st.chat_input("Ask your question:"):
         with st.chat_message("user"):
             st.markdown(question)
-        handle_user_input(question)
+        handle_user_input(question, research_area)
 
 
 if __name__ == "__main__":

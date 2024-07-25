@@ -56,8 +56,13 @@ def rerank_documents(question: str, documents):
     return reranked_documents
 
 
-def format_documents(question: str) -> List[Dict[str, str]]:
-    documents = retriever.get_relevant_documents(question)
+def format_documents(question: str, research_area: str) -> List[Dict[str, str]]:
+    if research_area != "All":
+        metadata = {"research_area": research_area}
+    else:
+        metadata = None
+
+    documents = retriever.get_relevant_documents(question, metadata=metadata)
     documents = rerank_documents(question, documents)
     return [
         {
@@ -82,7 +87,7 @@ def format_chat_history(messages: List[Dict[str, str]]) -> str:
 
 
 def chat_answer(
-    question: str, streamlit_chat_history: List
+    question: str, streamlit_chat_history: List, research_area: str
 ) -> Generator[str, None, None]:
 
     augmented_queries = cohere_client.chat(
@@ -93,7 +98,8 @@ def chat_answer(
     )
 
     if augmented_queries.search_queries:
-        documents = format_documents(augmented_queries.search_queries[0].text)
+        augmented_query = augmented_queries.search_queries[0].text
+        documents = format_documents(augmented_query, research_area)
     else:
         documents = None
 
