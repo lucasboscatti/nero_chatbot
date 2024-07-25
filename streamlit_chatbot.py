@@ -4,37 +4,24 @@ import streamlit as st
 
 from libs.inference import chat_answer
 
-INIT_MESSAGE = {
-    "role": "assistant",
-    "content": "Hello, I am AuRoRa, the Virtual Assistant of Nero. How can I help you today?",
-}
-
 
 def set_page_config():
     st.set_page_config(page_title="Chat With AuRoRa", layout="wide", page_icon="🤖")
 
 
 def new_chat():
-    st.session_state.messages = [INIT_MESSAGE]
+    st.session_state.messages = []
 
 
 def initialize_session_state():
     if "messages" not in st.session_state:
-        st.session_state.messages = [INIT_MESSAGE]
+        st.session_state.messages = []
 
 
 def display_chat_history():
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-
-
-def get_sources() -> List[str]:
-    try:
-        with open("sources.txt", "r") as file:
-            return [line.strip() for line in file.readlines()]
-    except FileNotFoundError:
-        return []
 
 
 def display_sources(sources: List[str]):
@@ -50,15 +37,19 @@ def handle_user_input(question: str):
     with st.chat_message("assistant"):
         response = st.write_stream(chat_answer(question, st.session_state.messages))
 
-        sources = get_sources()
-        display_sources(sources)
+        with open("sources.txt", "r") as file:
+            sources = [line.strip() for line in file.readlines()]
 
-        full_response = (
-            response + "\n" + "\n".join(f"[{i+1}] {s}" for i, s in enumerate(sources))
-        )
-        st.session_state.messages.append(
-            {"role": "assistant", "content": full_response}
-        )
+            source_response = ""
+            if sources:
+                source_response += "\nSources:\n"
+                for index, source in enumerate(sources, start=1):
+                    source_response += f"\n[{index}] {source}"
+
+                st.markdown(source_response)
+                response += "\n" + source_response
+
+        st.session_state.messages.append({"role": "assistant", "content": response})
 
 
 def set_sidebar_footer():

@@ -96,7 +96,9 @@ def get_chunks(documents: List[Document]) -> List[Document]:
     return text_splitter.split_documents(documents)
 
 
-def create_and_save_index(documents: List[Document]) -> Tuple[str, CohereEmbeddings]:
+def create_and_save_index(
+    documents: List[Document], research_area: str
+) -> Tuple[str, CohereEmbeddings]:
     """
     Insert documents into Pinecone index.
 
@@ -108,7 +110,10 @@ def create_and_save_index(documents: List[Document]) -> Tuple[str, CohereEmbeddi
     """
     embedding_model = CohereEmbeddings(model="embed-english-v3.0")
     PineconeVectorStore.from_documents(
-        documents, index_name=PINECONE_INDEX, embedding=embedding_model
+        documents,
+        index_name=PINECONE_INDEX,
+        embedding=embedding_model,
+        namespace=research_area,
     )
     return
 
@@ -126,7 +131,7 @@ def embedding_documents(file, metadata: Dict) -> bool:
     """
     try:
         documents = create_documents(file, metadata)
-        create_and_save_index(documents)
+        create_and_save_index(documents, metadata["research_area"])
         return True
     except Exception as e:
         st.error(f"Error during document embedding: {str(e)}")
