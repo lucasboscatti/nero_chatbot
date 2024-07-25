@@ -57,12 +57,6 @@ def display_admin_page() -> None:
 
     st.markdown("# 📝 Add new papers")
 
-    if "form_submitted" not in st.session_state:
-        st.session_state.form_submitted = False
-
-    if "article_doc" not in st.session_state:
-        st.session_state.article_doc = None
-
     article_doc = st.file_uploader(
         "Select an paper (pdf or docx)", type=["pdf", "docx"]
     )
@@ -101,7 +95,7 @@ def display_admin_page() -> None:
 
         submitted = st.form_submit_button("Submit")
         if submitted:
-            st.session_state.form_submitted = handle_form_submission(
+            handle_form_submission(
                 article_doc,
                 article_title,
                 first_author,
@@ -109,10 +103,6 @@ def display_admin_page() -> None:
                 publication_year,
                 gdrive_url,
             )
-
-    if st.session_state.form_submitted:
-        st.session_state.article_doc = None
-        st.experimental_rerun()
 
 
 def handle_form_submission(
@@ -122,7 +112,7 @@ def handle_form_submission(
     research_area: str,
     publication_year: int,
     gdrive_url: str,
-) -> bool:
+) -> None:
     """
     Handles the form submission for adding a new article.
 
@@ -133,13 +123,10 @@ def handle_form_submission(
         article_area (str): The area/topic of the article.
         article_year (int): The year the article was published.
         gdrive_url (str): The Google Drive URL for the article.
-
-    Returns:
-        bool: True if submission was successful, False otherwise.
     """
     if not article_doc:
         st.error("Please upload a file.")
-        return False
+        return
 
     if not all(
         [
@@ -151,7 +138,7 @@ def handle_form_submission(
         ]
     ):
         st.error("Please fill in all fields and upload a file.")
-        return False
+        return
 
     article_metadata = {
         "article_title": article_title,
@@ -166,13 +153,10 @@ def handle_form_submission(
             success_embeddings = embedding_documents(article_doc, article_metadata)
         if success_embeddings:
             st.success("Paper added successfully!")
-            return True
         else:
             st.warning("Error inserting the paper. Please try again.")
-            return False
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
-        return False
 
 
 set_page_config()
