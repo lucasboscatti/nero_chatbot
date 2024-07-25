@@ -124,9 +124,12 @@ def handle_form_submission(
         article_year (int): The year the article was published.
         gdrive_url (str): The Google Drive URL for the article.
     """
+    if not article_doc:
+        st.error("Please upload a file.")
+        return
+
     if not all(
         [
-            article_doc,
             article_title,
             first_author,
             research_area,

@@ -64,7 +64,7 @@ def load_document(file) -> List[Document]:
     parser = LlamaParse(
         api_key=LLAMA_CLOUD_API_KEY,
         result_type="text",
-        num_workers=1,
+        num_workers=4,
         verbose=True,
     )
 
