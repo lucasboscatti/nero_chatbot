@@ -6,7 +6,11 @@ from libs.inference import chat_answer
 
 
 def set_page_config():
-    st.set_page_config(page_title="Chat With AuRoRa", layout="wide", page_icon="🤖")
+    st.set_page_config(
+        page_title="Chat With AuRoRa",
+        layout="wide",
+        page_icon="assets/nero_logo.png",
+    )
 
 
 def new_chat():
@@ -83,7 +87,7 @@ def set_sidebar_text():
         margin-bottom: 30px;
     }
     .follow-us {
-        margin-top: 70px;
+        margin-top: 0px;
     }
     .follow-us p {
         font-size: 14px;
@@ -164,6 +168,7 @@ def main():
     st.caption("💬 Nero Virtual Assistant")
 
     with st.sidebar:
+        st.image("assets/nero_banner.png")
         research_area = st.selectbox(
             "Filter by research area",
             (
