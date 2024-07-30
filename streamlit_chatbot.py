@@ -39,23 +39,29 @@ def handle_user_input(question: str, research_area: str):
     st.session_state.messages.append({"role": "user", "content": question})
 
     with st.chat_message("assistant"):
-        response = st.write_stream(
-            chat_answer(question, st.session_state.messages, research_area)
+        message_placeholder = st.empty()
+        full_response = ""
+        sources = []
+
+        for chunk in chat_answer(question, st.session_state.messages, research_area):
+            if isinstance(chunk, list):  # This is the list of sources
+                sources = chunk
+            else:  # This is a text chunk
+                full_response += chunk
+                message_placeholder.markdown(full_response + "▌")
+
+        message_placeholder.markdown(full_response)
+
+        if sources:
+            source_response = "\nSources:\n"
+            for index, source in enumerate(sources, start=1):
+                source_response += f"\n[{index}] {source}"
+            st.markdown(source_response)
+            full_response += "\n" + source_response
+
+        st.session_state.messages.append(
+            {"role": "assistant", "content": full_response}
         )
-
-        with open("sources.txt", "r") as file:
-            sources = [line.strip() for line in file.readlines()]
-
-            source_response = ""
-            if sources:
-                source_response += "\nSources:\n"
-                for index, source in enumerate(sources, start=1):
-                    source_response += f"\n[{index}] {source}"
-
-                st.markdown(source_response)
-                response += "\n" + source_response
-
-        st.session_state.messages.append({"role": "assistant", "content": response})
 
 
 def set_sidebar_text():

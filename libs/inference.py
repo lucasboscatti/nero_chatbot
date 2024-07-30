@@ -62,7 +62,7 @@ def format_documents(question: str, research_area: str) -> List[Dict[str, str]]:
     else:
         metadata = None
 
-    documents = retriever.get_relevant_documents(question, metadata=metadata)
+    documents = retriever.invoke(question, metadata=metadata)
     documents = rerank_documents(question, documents)
     return [
         {
@@ -82,7 +82,6 @@ def format_chat_history(messages: List[Dict[str, str]]) -> str:
         elif message["role"] == "assistant":
             chat_history.append({"role": "CHATBOT", "message": message["content"]})
 
-    print("CHAT HISTORY: ", chat_history)
     return chat_history if chat_history else None
 
 
@@ -117,7 +116,8 @@ def chat_answer(
         elif event.event_type == "citation-generation":
             citations.extend(event.citations[0].document_ids)
         elif event.event_type == "stream-end":
-            process_citations(event, citations)
+            sources = process_citations(event, citations)
+            yield sources
 
 
 def process_citations(event, citations):
@@ -128,10 +128,4 @@ def process_citations(event, citations):
         for doc in event.response.documents
         if doc["id"] == citation
     ]
-    unique_sources = list(set(sources))
-    save_sources(unique_sources)
-
-
-def save_sources(sources: List[str]):
-    with open("sources.txt", "w") as f:
-        f.write("\n".join(sources))
+    return list(set(sources))
