@@ -1,6 +1,6 @@
 import hmac
 from datetime import datetime
-from typing import Optional
+from typing import Dict, List, Optional, Union
 
 import streamlit as st
 
@@ -31,9 +31,11 @@ def check_password() -> bool:
 
     if st.session_state.get("password_correct", False):
         return True
+
     st.markdown("# 🖥️🔒 Administrator Area")
     st.markdown(
-        "This area is exclusively for administrators. If you are not an administrator, please return to [AuRoRa Chat](https://nero-chatbot.streamlit.app/)."
+        "This area is exclusively for administrators. If you are not an administrator, "
+        "please return to [AuRoRa Chat](https://nero-chatbot.streamlit.app/)."
     )
 
     st.text_input(
@@ -50,6 +52,20 @@ def check_password() -> bool:
     return True
 
 
+def get_research_areas() -> List[str]:
+    return [
+        "Aerial Robot Control",
+        "Ground Robot Control",
+        "Robot Formation",
+        "Robot Control",
+        "Formation Control",
+        "Human-Robot Interaction",
+        "Artificial Intelligence",
+        "Robotics Competition",
+        "Educational Robotics",
+    ]
+
+
 def display_admin_page() -> None:
     """Displays the admin page if the password is correct."""
     if not check_password():
@@ -57,31 +73,20 @@ def display_admin_page() -> None:
 
     st.markdown("# 📝 Add new papers")
 
-    article_doc = st.file_uploader(
-        "Select an paper (pdf or docx)", type=["pdf", "docx"]
-    )
+    article_doc = st.file_uploader("Select a paper (PDF or DOCX)", type=["pdf", "docx"])
 
     with st.form("pdf_form"):
         article_title = st.text_input("Paper title", placeholder="Title of the paper")
         research_area = st.selectbox(
             "Research area",
-            (
-                "Aerial Robot Control",
-                "Ground Robot Control",
-                "Robot Formation",
-                "Robot Control",
-                "Formation Control",
-                "Human-Robot Interaction",
-                "Artificial Intelligence",
-                "Robotics Competition",
-                "Educational Robotics",
-            ),
+            options=get_research_areas(),
             index=None,
             placeholder="Area of research",
         )
+        current_year = datetime.now().year
         publication_year = st.selectbox(
             "Year of publication",
-            range(2000, datetime.now().year + 1),
+            options=range(current_year, 1999, -1),
             index=None,
             placeholder="Select the year of publication",
         )
@@ -105,6 +110,51 @@ def display_admin_page() -> None:
             )
 
 
+def validate_form_data(
+    article_doc: bytes,
+    article_title: str,
+    first_author: str,
+    research_area: str,
+    publication_year: int,
+    gdrive_url: str,
+) -> str:
+    """
+    Validates the form data.
+
+    Returns:
+        str: An error message if validation fails, None otherwise.
+    """
+    if not article_doc:
+        return "Please upload a file."
+    if not all(
+        [article_title, first_author, research_area, publication_year, gdrive_url]
+    ):
+        return "Please fill in all fields and upload a file."
+    return None
+
+
+def create_article_metadata(
+    article_title: str,
+    first_author: str,
+    research_area: str,
+    publication_year: int,
+    gdrive_url: str,
+) -> Dict[str, Union[str, int]]:
+    """
+    Creates a metadata dictionary for the article.
+
+    Returns:
+        Dict[str, Union[str, int]]: The article metadata.
+    """
+    return {
+        "article_title": article_title,
+        "first_author": first_author,
+        "research_area": research_area,
+        "publication_year": publication_year,
+        "source": gdrive_url,
+    }
+
+
 def handle_form_submission(
     article_doc: Optional[bytes],
     article_title: str,
@@ -120,33 +170,25 @@ def handle_form_submission(
         article_doc (Optional[bytes]): The uploaded article document.
         article_title (str): The title of the article.
         first_author (str): The name of the first author.
-        article_area (str): The area/topic of the article.
-        article_year (int): The year the article was published.
+        research_area (str): The area/topic of the article.
+        publication_year (int): The year the article was published.
         gdrive_url (str): The Google Drive URL for the article.
     """
-    if not article_doc:
-        st.error("Please upload a file.")
+    error_message = validate_form_data(
+        article_doc,
+        article_title,
+        first_author,
+        research_area,
+        publication_year,
+        gdrive_url,
+    )
+    if error_message:
+        st.error(error_message)
         return
 
-    if not all(
-        [
-            article_title,
-            first_author,
-            research_area,
-            publication_year,
-            gdrive_url,
-        ]
-    ):
-        st.error("Please fill in all fields and upload a file.")
-        return
-
-    article_metadata = {
-        "article_title": article_title,
-        "first_author": first_author,
-        "research_area": research_area,
-        "publication_year": publication_year,
-        "source": gdrive_url,
-    }
+    article_metadata = create_article_metadata(
+        article_title, first_author, research_area, publication_year, gdrive_url
+    )
 
     try:
         with st.spinner("Processing the paper... This may take a moment."):
