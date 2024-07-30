@@ -44,18 +44,18 @@ def handle_user_input(question: str, research_area: str):
         sources = []
 
         for chunk in chat_answer(question, st.session_state.messages, research_area):
-            if isinstance(chunk, list): 
+            if isinstance(chunk, list):
                 sources = chunk
-            else: 
+            else:
                 full_response += chunk
                 message_placeholder.markdown(full_response + "▌")
 
         message_placeholder.markdown(full_response)
 
         if sources:
-            source_response = "\nSources:\n"
+            source_response = "\nSources:"
             for index, source in enumerate(sources, start=1):
-                source_response += f"\n[{index}] {source}"
+                source_response += f"\n\n[{index}] {source}"
             st.markdown(source_response)
             full_response += "\n" + source_response
 
