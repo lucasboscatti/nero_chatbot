@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Union
 
 import streamlit as st
 
-from libs.indexing_articles import embedding_documents
+from libs.indexing_articles import embed_documents
 
 
 def set_page_config():
@@ -192,7 +192,7 @@ def handle_form_submission(
 
     try:
         with st.spinner("Processing the paper... This may take a moment."):
-            success_embeddings = embedding_documents(article_doc, article_metadata)
+            success_embeddings = embed_documents(article_doc, article_metadata)
         if success_embeddings:
             st.success("Paper added successfully!")
         else:

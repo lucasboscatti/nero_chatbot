@@ -44,9 +44,9 @@ def handle_user_input(question: str, research_area: str):
         sources = []
 
         for chunk in chat_answer(question, st.session_state.messages, research_area):
-            if isinstance(chunk, list):  # This is the list of sources
+            if isinstance(chunk, list): 
                 sources = chunk
-            else:  # This is a text chunk
+            else: 
                 full_response += chunk
                 message_placeholder.markdown(full_response + "▌")
 
@@ -65,7 +65,6 @@ def handle_user_input(question: str, research_area: str):
 
 
 def set_sidebar_text():
-    # CSS for styling the sidebar footer
     css = """
     <style>
     .sidebar .sidebar-content {

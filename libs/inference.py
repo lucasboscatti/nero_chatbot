@@ -1,16 +1,20 @@
 from typing import Dict, Generator, List
 
 import cohere
-import streamlit as st
 from langchain_cohere import CohereEmbeddings
 from langchain_pinecone import PineconeVectorStore
 
-COHERE_API_KEY = st.secrets["COHERE_API_KEY"]
-PINECONE_INDEX = st.secrets["PINECONE_INDEX"]
+from libs.config import Config
 
-cohere_client = cohere.Client(api_key=COHERE_API_KEY)
-embeddings = CohereEmbeddings(cohere_api_key=COHERE_API_KEY, model="embed-english-v3.0")
-vectorstore = PineconeVectorStore(index_name=PINECONE_INDEX, embedding=embeddings)
+config = Config()
+
+cohere_client = cohere.Client(api_key=config.COHERE_API_KEY)
+embeddings = CohereEmbeddings(
+    cohere_api_key=config.COHERE_API_KEY, model="embed-english-v3.0"
+)
+vectorstore = PineconeVectorStore(
+    index_name=config.PINECONE_INDEX, embedding=embeddings
+)
 retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
 
 preamble = """
@@ -48,19 +52,16 @@ def rerank_documents(question: str, documents):
     rerank = cohere_client.rerank(
         model="rerank-english-v3.0", query=question, documents=docs, top_n=3
     )
-    reranked_documents = []
-    for result in rerank.results:
-        if result.relevance_score >= 0.5:
-            reranked_documents.append(documents[result.index])
 
-    return reranked_documents
+    return [
+        documents[result.index]
+        for result in rerank.results
+        if result.relevance_score >= 0.5
+    ]
 
 
 def format_documents(question: str, research_area: str) -> List[Dict[str, str]]:
-    if research_area != "All":
-        metadata = {"research_area": research_area}
-    else:
-        metadata = None
+    metadata = {"research_area": research_area} if research_area != "All" else None
 
     documents = retriever.invoke(question, metadata=metadata)
     documents = rerank_documents(question, documents)

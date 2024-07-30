@@ -1,6 +1,6 @@
 import os
 import tempfile
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List
 
 import nest_asyncio
 import streamlit as st
@@ -9,25 +9,22 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_cohere import CohereEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from llama_parse import LlamaParse
+from streamlit.runtime.uploaded_file_manager import UploadedFile
+
+from libs.config import Config
 
 nest_asyncio.apply()
 
-
-os.environ["COHERE_API_KEY"] = st.secrets["COHERE_API_KEY"]
-os.environ["PINECONE_API_KEY"] = st.secrets["PINECONE_API_KEY"]
+config = Config()
 
 
-PINECONE_INDEX = st.secrets["PINECONE_INDEX"]
-LLAMA_CLOUD_API_KEY = st.secrets["LLAMA_CLOUD_API_KEY"]
-
-
-def add_metadata(documents: List[Document], metadata: Dict) -> List[Document]:
+def add_metadata(documents: List[Document], metadata: Dict[str, Any]) -> List[Document]:
     """
     Add metadata to a list of documents.
 
     Args:
         documents (List[Document]): List of documents to which metadata is added.
-        metadata (Dict): Metadata to be added to the documents.
+        metadata (Dict[str, Any]): Metadata to be added to the documents.
 
     Returns:
         List[Document]: Updated list of documents with added metadata.
@@ -35,34 +32,37 @@ def add_metadata(documents: List[Document], metadata: Dict) -> List[Document]:
     return [Document(page_content=doc.text, metadata=metadata) for doc in documents]
 
 
-def create_documents(file, metadata: Dict) -> List[Document]:
+def create_documents(file: UploadedFile, metadata: Dict[str, Any]) -> List[Document]:
     """
     Load documents, add metadata, and split into chunks.
 
     Args:
-        file (st.UploadedFile): Uploaded file object.
-        metadata (Dict): Metadata to be added to the documents.
+        file (UploadedFile): Uploaded file object.
+        metadata (Dict[str, Any]): Metadata to be added to the documents.
 
     Returns:
         List[Document]: List of document chunks.
     """
     documents = load_document(file)
     documents_with_metadata = add_metadata(documents, metadata)
-    return get_chunks(documents_with_metadata)
+    return split_documents(documents_with_metadata)
 
 
-def load_document(file) -> List[Document]:
+def load_document(file: UploadedFile) -> List[Document]:
     """
     Load documents using LlamaParse.
 
     Args:
-        file (st.UploadedFile): Uploaded file object.
+        file (UploadedFile): Uploaded file object.
 
     Returns:
         List[Document]: List of loaded documents.
+
+    Raises:
+        ValueError: If the file cannot be processed.
     """
     parser = LlamaParse(
-        api_key=LLAMA_CLOUD_API_KEY,
+        api_key=config.LLAMA_CLOUD_API_KEY,
         result_type="text",
         num_workers=4,
         verbose=True,
@@ -76,50 +76,61 @@ def load_document(file) -> List[Document]:
 
     try:
         documents = parser.load_data(tmp_file_path)
+        if not documents:
+            raise ValueError("No documents were extracted from the file.")
+    except Exception as e:
+        raise ValueError(f"Error processing file: {str(e)}") from e
     finally:
         os.remove(tmp_file_path)
+        return documents
 
-    return documents
 
-
-def get_chunks(documents: List[Document]) -> List[Document]:
+def split_documents(
+    documents: List[Document], chunk_size: int = 1000, chunk_overlap: int = 200
+) -> List[Document]:
     """
     Split documents into chunks.
 
     Args:
         documents (List[Document]): List of documents to be split.
+        chunk_size (int, optional): The size of each chunk. Defaults to 1000.
+        chunk_overlap (int, optional): The overlap between chunks. Defaults to 200.
 
     Returns:
         List[Document]: List of document chunks.
     """
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap
+    )
     return text_splitter.split_documents(documents)
 
 
-def create_and_save_index(documents: List[Document]) -> Tuple[str, CohereEmbeddings]:
+def create_and_save_index(documents: List[Document]) -> None:
     """
     Insert documents into Pinecone index.
 
     Args:
         documents (List[Document]): List of documents to create index from.
 
-    Returns:
-        None
+    Raises:
+        ValueError: If there's an error creating or saving the index.
     """
-    embedding_model = CohereEmbeddings(model="embed-english-v3.0")
-    PineconeVectorStore.from_documents(
-        documents, index_name=PINECONE_INDEX, embedding=embedding_model
-    )
-    return
+    try:
+        embedding_model = CohereEmbeddings(model="embed-english-v3.0")
+        PineconeVectorStore.from_documents(
+            documents, index_name=config.PINECONE_INDEX, embedding=embedding_model
+        )
+    except Exception as e:
+        raise ValueError(f"Error creating or saving index: {str(e)}") from e
 
 
-def embedding_documents(file, metadata: Dict) -> bool:
+def embed_documents(file: UploadedFile, metadata: Dict[str, Any]) -> None:
     """
     Embed documents into the vector store.
 
     Args:
-        file (st.UploadedFile): Uploaded file object.
-        metadata (Dict): Metadata of the document.
+        file (UploadedFile): Uploaded file object.
+        metadata (Dict[str, Any]): Metadata of the document.
 
     Returns:
         bool: True if embedding is successful, False otherwise.
