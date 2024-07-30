@@ -15,7 +15,6 @@ embeddings = CohereEmbeddings(
 vectorstore = PineconeVectorStore(
     index_name=config.PINECONE_INDEX, embedding=embeddings
 )
-retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
 
 preamble = """
 
@@ -32,10 +31,10 @@ You are AuRoRa, the Virtual Assistant of Nero (Núcleo de Especialização em Ro
 - Robotics Competition
 - Educational Robotics
 
-Use the provided documents, which consist of Nero's articles, to assist in answering these questions.
+Use the provided documents, which consist of Nero's articles, to assist in answering these questions. 
 
 ## Tone
-Maintain a polite and respectful demeanor. Use academic language appropriate for a university setting
+Maintain a polite and respectful attitude. Use academic language appropriate for a university environment
 
 ## Guidelines
 1. Answer questions exclusively related to Nero's research areas
@@ -44,6 +43,7 @@ Maintain a polite and respectful demeanor. Use academic language appropriate for
 4. Keep responses concise, using at most three sentences
 5. Do not answer questions outside the scope of Nero's research areas
 6. If the retrieved documents are not relevant to the question, inform the user that you don't have the necessary information
+7. If the user's question is related to Nero research areas, but you have not received any documents, inform the user that you do not have the necessary information
 """
 
 
@@ -60,18 +60,23 @@ def rerank_documents(question: str, documents):
     ]
 
 
-def format_documents(question: str, research_area: str) -> List[Dict[str, str]]:
+def format_documents(query: str, research_area: str) -> List[Dict[str, str]]:
     metadata = {"research_area": research_area} if research_area != "All" else None
 
-    documents = retriever.invoke(question, metadata=metadata)
-    documents = rerank_documents(question, documents)
-    return [
-        {
-            "title": f'[{doc.metadata.get("first_author")} ({int(doc.metadata.get("publication_year"))}). {doc.metadata.get("article_title")}]({doc.metadata.get("source")})',
-            "snippet": doc.page_content,
-        }
-        for doc in documents
-    ]
+    documents = vectorstore.as_retriever(
+        search_kwargs=({"k": 10, "filter": metadata} if metadata else {"k": 10})
+    ).invoke(query)
+
+    if documents:
+        reranked_documents = rerank_documents(query, documents)
+
+        return [
+            {
+                "title": f'[{doc.metadata.get("first_author")} ({int(doc.metadata.get("publication_year"))}). {doc.metadata.get("article_title")}]({doc.metadata.get("source")})',
+                "snippet": doc.page_content,
+            }
+            for doc in reranked_documents
+        ]
 
 
 def format_chat_history(messages: List[Dict[str, str]]) -> str:
