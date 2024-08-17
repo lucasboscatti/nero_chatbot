@@ -166,3 +166,5 @@ cython_debug/
 *.db
 *.json
 *.txt
+*.DS_Store
+*.pkl
