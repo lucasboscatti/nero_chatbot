@@ -127,7 +127,8 @@ def chat_answer(
     augmented_queries = cohere_client.chat(
         message=question,
         model="command-r-plus",
-        temperature=0.2,
+        temperature=0.3,
+        chat_history=format_chat_history(streamlit_chat_history),
         search_queries_only=True,
     )
 
@@ -144,7 +145,7 @@ def chat_answer(
         preamble=preamble,
         chat_history=format_chat_history(streamlit_chat_history),
         documents=documents,
-        temperature=0.2,
+        temperature=0.0,
     ):
         if event.event_type == "text-generation":
             yield event.text
