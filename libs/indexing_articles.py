@@ -4,11 +4,13 @@ from typing import Any, Dict, List
 
 import nest_asyncio
 import streamlit as st
-from langchain.docstore.document import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_cohere import CohereEmbeddings
-from langchain_pinecone import PineconeVectorStore
+from llama_index.core import Document, Settings, StorageContext, VectorStoreIndex
+from llama_index.core.node_parser import MarkdownElementNodeParser
+from llama_index.embeddings.cohere import CohereEmbedding
+from llama_index.llms.groq import Groq
+from llama_index.vector_stores.pinecone import PineconeVectorStore
 from llama_parse import LlamaParse
+from pinecone import Pinecone
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from libs.config import Config
@@ -16,6 +18,46 @@ from libs.config import Config
 nest_asyncio.apply()
 
 config = Config()
+
+embed_model = CohereEmbedding(
+    model="embed-english-v3.0",
+    input_type="search_document",
+    api_key=config.COHERE_API_KEY,
+)
+
+llm = Groq(
+    model="llama-3.1-8b-instant",
+    api_key=config.GROQ_API_KEY,
+    is_function_calling_model=False,
+)
+
+Settings.llm = llm
+Settings.embed_model = embed_model
+
+Settings.chunk_size = 512
+Settings.chunk_overlap = 20
+
+pc = Pinecone(
+    api_key=config.PINECONE_API_KEY,
+)
+
+pinecone_index = pc.Index(config.PINECONE_INDEX)
+
+vector_store = PineconeVectorStore(
+    pinecone_index=pinecone_index,
+    embedding=embed_model,
+    api_key=config.PINECONE_API_KEY,
+)
+storage_context = StorageContext.from_defaults(vector_store=vector_store)
+
+parser = LlamaParse(
+    api_key=config.LLAMA_CLOUD_API_KEY,
+    result_type="markdown",
+    num_workers=4,
+    verbose=True,
+)
+
+node_parser = MarkdownElementNodeParser(llm=llm, num_workers=8)
 
 
 def add_metadata(documents: List[Document], metadata: Dict[str, Any]) -> List[Document]:
@@ -29,7 +71,9 @@ def add_metadata(documents: List[Document], metadata: Dict[str, Any]) -> List[Do
     Returns:
         List[Document]: Updated list of documents with added metadata.
     """
-    return [Document(page_content=doc.text, metadata=metadata) for doc in documents]
+    for doc in documents:
+        doc.metadata.update(metadata)
+    return documents
 
 
 def create_documents(file: UploadedFile, metadata: Dict[str, Any]) -> List[Document]:
@@ -61,13 +105,6 @@ def load_document(file: UploadedFile) -> List[Document]:
     Raises:
         ValueError: If the file cannot be processed.
     """
-    parser = LlamaParse(
-        api_key=config.LLAMA_CLOUD_API_KEY,
-        result_type="text",
-        num_workers=4,
-        verbose=True,
-    )
-
     with tempfile.NamedTemporaryFile(
         delete=False, suffix=f".{file.name.split('.')[-1]}"
     ) as tmp_file:
@@ -99,10 +136,9 @@ def split_documents(
     Returns:
         List[Document]: List of document chunks.
     """
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size, chunk_overlap=chunk_overlap
-    )
-    return text_splitter.split_documents(documents)
+    nodes = node_parser.get_nodes_from_documents(documents)
+    base_nodes, objects = node_parser.get_nodes_and_objects(nodes)
+    return base_nodes + objects
 
 
 def create_and_save_index(documents: List[Document]) -> None:
@@ -116,10 +152,7 @@ def create_and_save_index(documents: List[Document]) -> None:
         ValueError: If there's an error creating or saving the index.
     """
     try:
-        embedding_model = CohereEmbeddings(model="embed-english-v3.0")
-        PineconeVectorStore.from_documents(
-            documents, index_name=config.PINECONE_INDEX, embedding=embedding_model
-        )
+        VectorStoreIndex(documents, storage_context=storage_context)
     except Exception as e:
         raise ValueError(f"Error creating or saving index: {str(e)}") from e
 

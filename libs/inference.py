@@ -1,20 +1,40 @@
 from typing import Dict, Generator, List
 
 import cohere
-from langchain_cohere import CohereEmbeddings
-from langchain_pinecone import PineconeVectorStore
+from llama_index.core import VectorStoreIndex
+from llama_index.core.settings import Settings
+from llama_index.core.vector_stores import (
+    FilterOperator,
+    MetadataFilter,
+    MetadataFilters,
+)
+from llama_index.embeddings.cohere import CohereEmbedding
+from llama_index.vector_stores.pinecone import PineconeVectorStore
+from pinecone import Pinecone
 
 from libs.config import Config
 
 config = Config()
 
 cohere_client = cohere.Client(api_key=config.COHERE_API_KEY)
-embeddings = CohereEmbeddings(
-    cohere_api_key=config.COHERE_API_KEY, model="embed-english-v3.0"
+embeddings = CohereEmbedding(
+    model="embed-english-v3.0", input_type="search_query", api_key=config.COHERE_API_KEY
 )
-vectorstore = PineconeVectorStore(
-    index_name=config.PINECONE_INDEX, embedding=embeddings
+
+Settings.embed_model = embeddings
+
+pc = Pinecone(
+    api_key=config.PINECONE_API_KEY,
 )
+
+pinecone_index = pc.Index(config.PINECONE_INDEX)
+
+vector_store = PineconeVectorStore(
+    pinecone_index=pinecone_index,
+    embedding=embeddings,
+    api_key=config.PINECONE_API_KEY,
+)
+
 
 preamble = """
 
@@ -48,24 +68,33 @@ Maintain a polite and respectful attitude. Use academic language appropriate for
 
 
 def rerank_documents(question: str, documents):
-    docs = [doc.page_content for doc in documents]
+    docs = [doc.text for doc in documents]
     rerank = cohere_client.rerank(
         model="rerank-english-v3.0", query=question, documents=docs, top_n=3
     )
 
-    return [
-        documents[result.index]
-        for result in rerank.results
-        if result.relevance_score >= 0.5
-    ]
+    return [documents[result.index] for result in rerank.results]
 
 
 def format_documents(query: str, research_area: str) -> List[Dict[str, str]]:
-    metadata = {"research_area": research_area} if research_area != "All" else None
+    filter = (
+        MetadataFilters(
+            filters=[
+                MetadataFilter(
+                    key="research_area", operator=FilterOperator.EQ, value=research_area
+                ),
+            ]
+        )
+        if research_area != "All"
+        else None
+    )
 
-    documents = vectorstore.as_retriever(
-        search_kwargs=({"k": 10, "filter": metadata} if metadata else {"k": 10})
-    ).invoke(query)
+    retriever = VectorStoreIndex.from_vector_store(vector_store).as_retriever(
+        similarity_top_k=10,
+        filters=filter,
+    )
+
+    documents = retriever.retrieve(query)
 
     if documents:
         reranked_documents = rerank_documents(query, documents)
@@ -73,7 +102,7 @@ def format_documents(query: str, research_area: str) -> List[Dict[str, str]]:
         return [
             {
                 "title": f'[{doc.metadata.get("first_author")} ({int(doc.metadata.get("publication_year"))}). {doc.metadata.get("article_title")}]({doc.metadata.get("source")})',
-                "snippet": doc.page_content,
+                "snippet": doc.get_content(),
             }
             for doc in reranked_documents
         ]
