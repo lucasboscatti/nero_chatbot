@@ -73,7 +73,15 @@ def rerank_documents(question: str, documents):
         model="rerank-english-v3.0", query=question, documents=docs, top_n=3
     )
 
-    return [documents[result.index] for result in rerank.results]
+    reranked_documents = [documents[result.index] for result in rerank.results]
+
+    return [
+        {
+            "title": f'[{doc.metadata.get("first_author")} ({int(doc.metadata.get("publication_year"))}). {doc.metadata.get("article_title")}]({doc.metadata.get("source")})',
+            "snippet": doc.get_content(),
+        }
+        for doc in reranked_documents
+    ]
 
 
 def format_documents(query: str, research_area: str) -> List[Dict[str, str]]:
@@ -96,16 +104,7 @@ def format_documents(query: str, research_area: str) -> List[Dict[str, str]]:
 
     documents = retriever.retrieve(query)
 
-    if documents:
-        reranked_documents = rerank_documents(query, documents)
-
-        return [
-            {
-                "title": f'[{doc.metadata.get("first_author")} ({int(doc.metadata.get("publication_year"))}). {doc.metadata.get("article_title")}]({doc.metadata.get("source")})',
-                "snippet": doc.get_content(),
-            }
-            for doc in reranked_documents
-        ]
+    return documents
 
 
 def format_chat_history(messages: List[Dict[str, str]]) -> str:
@@ -132,9 +131,12 @@ def chat_answer(
         search_queries_only=True,
     )
 
+    related_documents = []
     if augmented_queries.search_queries:
-        augmented_query = augmented_queries.search_queries[0].text
-        documents = format_documents(augmented_query, research_area)
+        for augmented_query in augmented_queries.search_queries:
+            documents = format_documents(augmented_query.text, research_area)
+            related_documents.extend(documents)
+        documents = rerank_documents(question, related_documents)
     else:
         documents = None
 
