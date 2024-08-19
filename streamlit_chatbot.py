@@ -70,39 +70,39 @@ def set_sidebar_text():
     .sidebar .sidebar-content {
         background-color: #1E1E1E;
         color: #FFFFFF;
-        padding: 20px;
+        padding: 1.25rem;
         font-family: Arial, sans-serif;
     }
     .sidebar h2 {
         color: #FFFFFF;
-        font-size: 24px;
+        font-size: 1.5rem;
         font-weight: 600;
-        margin-bottom: 20px;
+        margin-bottom: 1.25rem;
     }
     .sidebar p {
-        font-size: 14px;
+        font-size: 0.875rem;
         line-height: 1.6;
-        margin-bottom: 20px;
+        margin-bottom: 1.25rem;
     }
     .sidebar .stButton>button {
         width: 100%;
-        margin-bottom: 20px;
+        margin-bottom: 1.25rem;
     }
     .sidebar .stSelectbox {
-        margin-bottom: 30px;
+        margin-bottom: 1.875rem;
     }
     .follow-us {
-        margin-top: 0px;
+        margin-top: 0;
     }
     .follow-us p {
-        font-size: 14px;
-        margin-bottom: 10px;
+        font-size: 0.875rem;
+        margin-bottom: 0.625rem;
     }
     .sidebar-footer {
         display: flex;
         justify-content: center;
-        gap: 15px;
-        margin-bottom: 20px;
+        gap: 0.9375rem;
+        margin-bottom: 1.25rem;
     }
     .sidebar-footer a {
         opacity: 0.7;
@@ -113,7 +113,7 @@ def set_sidebar_text():
     }
     .copyright {
         color: #AAAAAA;
-        font-size: 12px;
+        font-size: 0.75rem;
         text-align: center;
     }
     .copyright a {
@@ -122,6 +122,33 @@ def set_sidebar_text():
     }
     .copyright a:hover {
         text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+        .sidebar h2 {
+            font-size: 1.25rem;
+        }
+        .sidebar p, .follow-us p {
+            font-size: 0.8125rem;
+        }
+        .copyright {
+            font-size: 0.6875rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .sidebar .sidebar-content {
+            padding: 1rem;
+        }
+        .sidebar h2 {
+            font-size: 1.125rem;
+        }
+        .sidebar p, .follow-us p {
+            font-size: 0.75rem;
+        }
+        .copyright {
+            font-size: 0.625rem;
+        }
     }
     </style>
     """
