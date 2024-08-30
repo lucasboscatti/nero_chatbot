@@ -104,7 +104,7 @@ def chat_answer(
 
     augmented_queries = cohere_client.chat(
         message=question,
-        model="command-r-plus",
+        model="command-r-plus-08-2024",
         temperature=0.3,
         chat_history=format_chat_history(streamlit_chat_history),
         search_queries_only=True,
@@ -115,13 +115,16 @@ def chat_answer(
         for augmented_query in augmented_queries.search_queries:
             documents = format_documents(augmented_query.text, research_area)
             related_documents.extend(documents)
-        documents = rerank_documents(question, related_documents)
+        if related_documents:
+            documents = rerank_documents(question, related_documents)
+        else:
+            documents = None
     else:
         documents = None
 
     citations = []
     for event in cohere_client.chat_stream(
-        model="command-r-plus",
+        model="command-r-plus-08-2024",
         message=question,
         preamble=preamble,
         chat_history=format_chat_history(streamlit_chat_history),
