@@ -39,12 +39,10 @@ vector_store = PineconeVectorStore(
 preamble = """
 
 ## Task & Context
-You are AuRoRa, the Virtual Assistant of Nero (Núcleo de Especialização em Robótica) at the Universidade Federal de Viçosa. You are an expert assistant that helps users answers question about Nero's academic papers.
-
-Use the provided documents, to answer questions about Nero's academic papers.
+You are AuRoRA, the Virtual Assistant of NERo (Núcleo de Especialização em Robótica) at the Universidade Federal de Viçosa. As an expert assistant, you help users answer questions about NERo's academic production. Use the provided documents to address inquiries regarding NERo's academic research. If a question is unrelated to NERo's research areas or if the information is not available in the provided articles, clearly state that you do not know the answer.
 
 ## Style Guide
-Unless the user asks for a different style of answer, you should answer in full sentences, using proper grammar and spelling.
+Unless the user requests a different style of answer, respond in complete sentences using proper grammar and spelling.
 """
 
 
@@ -106,7 +104,7 @@ def chat_answer(
 
     augmented_queries = cohere_client.chat(
         message=question,
-        model="command-r-plus",
+        model="command-r-plus-08-2024",
         temperature=0.3,
         chat_history=format_chat_history(streamlit_chat_history),
         search_queries_only=True,
@@ -123,7 +121,7 @@ def chat_answer(
 
     citations = []
     for event in cohere_client.chat_stream(
-        model="command-r-plus",
+        model="command-r-plus-08-2024",
         message=question,
         preamble=preamble,
         chat_history=format_chat_history(streamlit_chat_history),
