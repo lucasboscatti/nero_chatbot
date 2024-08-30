@@ -104,7 +104,7 @@ def chat_answer(
 
     augmented_queries = cohere_client.chat(
         message=question,
-        model="command-r-plus-08-2024",
+        model="command-r-plus",
         temperature=0.3,
         chat_history=format_chat_history(streamlit_chat_history),
         search_queries_only=True,
@@ -121,7 +121,7 @@ def chat_answer(
 
     citations = []
     for event in cohere_client.chat_stream(
-        model="command-r-plus-08-2024",
+        model="command-r-plus",
         message=question,
         preamble=preamble,
         chat_history=format_chat_history(streamlit_chat_history),
